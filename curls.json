@@ -1,0 +1,11 @@
+[
+	{
+		"name": "Test curl",
+		"command": "curl https://jsonplaceholder.typicode.com/todos/1 -o /dev/null -w \"%{time_total}\"",
+		"count": 5
+	},
+	{
+		"name": "new",
+		"command": "curl https://jsonplaceholder.typicode.com/todos/1 -o /dev/null -w \"%{time_total}\""
+	}
+]
