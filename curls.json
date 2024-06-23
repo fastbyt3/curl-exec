@@ -1,11 +1,12 @@
 [
 	{
 		"name": "Test curl",
-		"command": "curl https://jsonplaceholder.typicode.com/todos/1 -o /dev/null -w \"%{time_total}\"",
+		"command": "curl https://jsonplaceholder.typicode.com/todos/1 -o /dev/null -w \"%{time_total} %{http_code}\"",
 		"count": 5
 	},
 	{
 		"name": "new",
-		"command": "curl https://jsonplaceholder.typicode.com/todos/1 -o /dev/null -w \"%{time_total}\""
+		"command": "curl http://localhost:9999/slow -o /dev/null -w \"%{time_total} %{http_code}\"",
+		"timeout": 10
 	}
 ]
