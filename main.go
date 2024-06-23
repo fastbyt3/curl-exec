@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -50,9 +51,7 @@ func read_curls_from_file(filename string) ([]Command, error) {
 	return cmds, nil
 }
 
-func run_curl_cmd(cmd Command, wg *sync.WaitGroup, ch chan<- Result) {
-	defer wg.Done()
-
+func run_curl_cmd(cmd Command) Result {
 	total := 0.0
 	successfulRequests := 0
 	count := cmd.Count
@@ -104,7 +103,7 @@ func run_curl_cmd(cmd Command, wg *sync.WaitGroup, ch chan<- Result) {
 		respTime, err := strconv.ParseFloat(respTimeStr, 64)
 		if err != nil {
 			fmt.Printf("Failed to parse output of curl to FLOAT... Error: %s\n", err)
-			return
+			continue
 		}
 
 		respTimes[i] = format_time(respTime)
@@ -123,7 +122,18 @@ func run_curl_cmd(cmd Command, wg *sync.WaitGroup, ch chan<- Result) {
 		StatusCodes:   statusCodes,
 		Failures:      count - successfulRequests,
 	}
-	ch <- result
+	return result
+}
+
+func worker(workerId int, wg *sync.WaitGroup, jobsCh <-chan Command, results chan<- Result) {
+	defer wg.Done()
+
+	for cmd := range jobsCh {
+		results <- run_curl_cmd(cmd)
+		log.Println("Completed execution => ", cmd.Name)
+	}
+
+	log.Printf("Shutting down worker %d", workerId)
 }
 
 func main() {
@@ -140,20 +150,31 @@ func main() {
 		return
 	}
 
+	workers := len(curlCmds)
+	if workers > 5 {
+		workers = 5
+	}
 	var wg sync.WaitGroup
-	ch := make(chan Result, len(curlCmds))
+	resultsCh := make(chan Result, len(curlCmds))
+	jobsCh := make(chan Command, len(curlCmds))
 
-	for _, cmd := range curlCmds {
+	log.Printf("Initializing %d workers...", workers)
+	for w:=0; w < workers; w++ {
 		wg.Add(1)
-		go run_curl_cmd(cmd, &wg, ch)
+		go worker(w, &wg, jobsCh, resultsCh)
 	}
 
+	for _, cmd := range curlCmds {
+		jobsCh <- cmd
+	}
+	close(jobsCh)
+
 	wg.Wait()
-	close(ch)
+	close(resultsCh)
 
 	var results []Result
 
-	for res := range ch {
+	for res := range resultsCh {
 		results = append(results, res)
 	}
 
